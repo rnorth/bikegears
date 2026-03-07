@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Youth Bike Gear Calculator</title>
+<style>
+  :root {
+    --bg: #f5f5f5;
+    --card: #fff;
+    --border: #ddd;
+    --text: #222;
+    --muted: #666;
+    --accent: #2563eb;
+    --green: #16a34a;
+    --amber: #d97706;
+    --red: #dc2626;
+    --light-green: #dcfce7;
+    --light-amber: #fef3c7;
+    --light-red: #fee2e2;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; padding: 20px; }
+  h1 { font-size: 1.4rem; margin-bottom: 4px; }
+  h2 { font-size: 1.1rem; margin-bottom: 8px; color: var(--accent); }
+  h3 { font-size: 0.95rem; margin-bottom: 6px; }
+  .subtitle { color: var(--muted); font-size: 0.85rem; margin-bottom: 16px; }
+  .layout { display: grid; grid-template-columns: 320px 1fr; gap: 20px; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .input-group { margin-bottom: 12px; }
+  .input-group label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 3px; color: var(--muted); }
+  .input-group input, .input-group select { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 0.9rem; }
+  .input-group input:focus, .input-group select:focus { outline: none; border-color: var(--accent); }
+  .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .help { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+  .presets { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .presets button { font-size: 0.7rem; padding: 2px 6px; border: 1px solid var(--border); border-radius: 3px; background: var(--bg); cursor: pointer; }
+  .presets button:hover { border-color: var(--accent); color: var(--accent); }
+
+  .results { display: flex; flex-direction: column; gap: 16px; }
+
+  /* Ranking table */
+  .ranking-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  .ranking-table th { text-align: left; padding: 6px 8px; border-bottom: 2px solid var(--border); font-size: 0.75rem; color: var(--muted); text-transform: uppercase; }
+  .ranking-table td { padding: 5px 8px; border-bottom: 1px solid var(--border); }
+  .ranking-table tr:hover { background: #f0f7ff; }
+  .ranking-table tr.selected { background: #dbeafe; }
+  .ranking-table tr { cursor: pointer; }
+  .rank-badge { display: inline-block; width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px; font-weight: 700; font-size: 0.7rem; }
+  .rank-1 { background: #fde047; color: #713f12; }
+  .rank-2 { background: #e5e7eb; color: #374151; }
+  .rank-3 { background: #fdba74; color: #7c2d12; }
+
+  .rollout-bar { height: 14px; border-radius: 3px; position: relative; }
+  .rollout-bar-fill { height: 100%; border-radius: 3px; }
+  .rollout-bar-label { position: absolute; right: 4px; top: 0; font-size: 0.65rem; line-height: 14px; font-weight: 600; }
+
+  /* Gear detail table */
+  .gear-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  .gear-table th { padding: 5px 6px; border-bottom: 2px solid var(--border); font-size: 0.75rem; color: var(--muted); text-align: center; }
+  .gear-table th:first-child { text-align: left; }
+  .gear-table td { padding: 4px 6px; border-bottom: 1px solid #eee; text-align: center; font-variant-numeric: tabular-nums; }
+  .gear-table td:first-child { text-align: left; font-weight: 600; }
+  .gear-cell { border-radius: 4px; padding: 3px 5px; font-size: 0.75rem; line-height: 1.3; }
+  .gear-cell .rollout { font-weight: 600; }
+  .gear-cell .detail { font-size: 0.65rem; color: var(--muted); }
+  .gear-cell.blocked { background: #f3f4f6; color: #9ca3af; text-decoration: line-through; }
+  .gear-cell.over-limit { background: var(--light-red); }
+  .gear-cell.angle-green { border-left: 3px solid var(--green); }
+  .gear-cell.angle-amber { border-left: 3px solid var(--amber); }
+  .gear-cell.angle-red { border-left: 3px solid var(--red); }
+  .gear-cell.max-gear { box-shadow: inset 0 0 0 2px var(--accent); }
+
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.7rem; color: var(--muted); align-items: center; margin-top: 4px; }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+  .legend-swatch { width: 14px; height: 14px; border-radius: 3px; }
+
+  .metric-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+  .metric-card { background: var(--bg); border-radius: 6px; padding: 8px 10px; text-align: center; }
+  .metric-card .value { font-size: 1.2rem; font-weight: 700; }
+  .metric-card .label { font-size: 0.7rem; color: var(--muted); }
+  .metric-card.good .value { color: var(--green); }
+  .metric-card.ok .value { color: var(--amber); }
+  .metric-card.bad .value { color: var(--red); }
+
+  .speed-chart { width: 100%; height: 200px; position: relative; }
+  .speed-bar-container { display: flex; align-items: flex-end; gap: 2px; height: 100%; padding-bottom: 20px; }
+  .speed-bar-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
+  .speed-bar { width: 100%; min-width: 8px; border-radius: 3px 3px 0 0; transition: height 0.2s; position: relative; }
+  .speed-bar-label { font-size: 0.55rem; color: var(--muted); margin-top: 2px; writing-mode: vertical-rl; transform: rotate(180deg); max-height: 60px; overflow: hidden; }
+  .speed-bar-value { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: 0.55rem; font-weight: 600; white-space: nowrap; }
+
+  .section-sep { border: none; border-top: 1px solid var(--border); margin: 8px 0; }
+
+  .config-name { font-weight: 600; font-size: 0.85rem; }
+  .config-detail { font-size: 0.75rem; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<h1>Youth Bike Gear Calculator</h1>
+<p class="subtitle">Optimise gearing for rollout-restricted racing. Click a configuration in the ranking to see its full gear table.</p>
+
+<div class="layout">
+  <div>
+    <div class="panel" style="margin-bottom: 12px;">
+      <h2>Bike Setup</h2>
+      <div class="input-group">
+        <label>Wheel Circumference (mm)</label>
+        <input type="number" id="wheelCirc" value="2109" step="1">
+        <div class="help">700c × 25mm ≈ 2109mm</div>
+        <div class="presets">
+          <button onclick="setWheel(2096)">700×23</button>
+          <button onclick="setWheel(2109)">700×25</button>
+          <button onclick="setWheel(2127)">700×28</button>
+          <button onclick="setWheel(2079)">700×20</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom: 12px;">
+      <h2>Race Rules</h2>
+      <div class="input-group">
+        <label>Rollout Limit (m)</label>
+        <input type="number" id="rolloutLimit" value="6.73" step="0.01">
+        <div class="presets">
+          <button onclick="setLimit(6.34)">Youth C</button>
+          <button onclick="setLimit(6.73)">Youth B</button>
+          <button onclick="setLimit(7.18)">Youth A</button>
+        </div>
+      </div>
+      <div class="input-group">
+        <label>Max Cogs to Block</label>
+        <input type="number" id="maxBlock" value="3" min="0" max="6" step="1">
+        <div class="help">Consecutive from smallest cog (derailleur H-limit)</div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom: 12px;">
+      <h2>Gearing Options</h2>
+      <div class="input-group">
+        <label>Chainring Sizes (comma separated)</label>
+        <input type="text" id="chainrings" value="34, 36, 38, 39, 40, 42, 44, 46, 48, 50">
+      </div>
+      <div class="input-group">
+        <label>Cassette (comma separated cog teeth)</label>
+        <input type="text" id="cassette" value="11, 12, 13, 14, 15, 17, 19, 21, 24, 28">
+        <div class="presets">
+          <button onclick="setCassette('11,12,13,14,15,17,19,21,23,25')">11-25</button>
+          <button onclick="setCassette('11,12,13,14,15,17,19,21,24,28')">11-28</button>
+          <button onclick="setCassette('11,12,13,15,17,19,21,23,26,30')">11-30</button>
+          <button onclick="setCassette('11,13,15,17,19,21,23,25,28,32')">11-32</button>
+          <button onclick="setCassette('11,13,15,17,19,21,24,28,32,36')">11-36</button>
+          <button onclick="setCassette('12,13,14,15,16,17,19,21,23,25')">12-25</button>
+          <button onclick="setCassette('12,13,14,15,16,17,19,21,24,28')">12-28</button>
+        </div>
+      </div>
+      <div class="input-group">
+        <label>Cadence for Speed Calc (RPM)</label>
+        <input type="number" id="cadence" value="90" step="5">
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom: 12px;">
+      <h2>Display</h2>
+      <div class="input-group">
+        <label>Show in Gear Table</label>
+        <select id="displayMetric">
+          <option value="rollout">Rollout (m)</option>
+          <option value="speed">Speed at cadence (km/h)</option>
+          <option value="ratio">Gear ratio</option>
+          <option value="inches">Gear inches</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <label>Chain Angle Warning Threshold (°)</label>
+        <input type="number" id="angleWarn" value="1.5" step="0.1">
+      </div>
+      <div class="input-group">
+        <label>Chain Angle Danger Threshold (°)</label>
+        <input type="number" id="angleDanger" value="2.5" step="0.1">
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Advanced Bike Setup</h2>
+      <div class="input-group">
+        <label>Chainstay Length (mm)</label>
+        <input type="number" id="chainstay" value="410" step="1">
+        <div class="help">Typical road: 405-420mm</div>
+      </div>
+      <div class="input-row">
+        <div class="input-group">
+          <label>Inner Chainring → CL (mm)</label>
+          <input type="number" id="chainlineInner" value="41" step="0.5">
+        </div>
+        <div class="input-group">
+          <label>Outer Chainring → CL (mm)</label>
+          <input type="number" id="chainlineOuter" value="46" step="0.5">
+        </div>
+      </div>
+      <div class="help" style="margin-bottom: 12px;">Distance from frame centreline to each chainring</div>
+      <div class="input-row">
+        <div class="input-group">
+          <label>Hub OLD (mm)</label>
+          <input type="number" id="hubOLD" value="130" step="1">
+        </div>
+        <div class="input-group">
+          <label>Locknut → 1st Cog (mm)</label>
+          <input type="number" id="locknutToCog" value="3.5" step="0.5">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>Cog Pitch (mm, centre-to-centre)</label>
+        <input type="number" id="cogPitch" value="3.95" step="0.05">
+        <div class="help">10-speed: 3.95mm</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="results" id="results">
+    <div class="panel" id="rankingPanel">
+      <h2>Best Configurations</h2>
+      <p class="help" style="margin-bottom: 8px;">Ranked by proximity to rollout limit. Speed loss and distance loss per km compare to a rider at the rollout limit, both spinning at the same cadence in top gear.</p>
+      <table class="ranking-table" id="rankingTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Chainring</th>
+            <th>Block</th>
+            <th>Smallest Avail.</th>
+            <th>Max Rollout</th>
+            <th>Gap to Limit</th>
+            <th>Speed Loss</th>
+            <th>Loss / km</th>
+            <th>Rollout</th>
+          </tr>
+        </thead>
+        <tbody id="rankingBody"></tbody>
+      </table>
+    </div>
+
+    <div class="panel" id="detailPanel" style="display:none;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
+        <div>
+          <h2 id="detailTitle">Configuration Detail</h2>
+          <div class="config-detail" id="detailSubtitle"></div>
+        </div>
+      </div>
+      <div class="metric-cards" id="metricCards" style="margin-bottom: 12px;"></div>
+      <hr class="section-sep">
+      <h3>Gear Table — <span id="gearTableMetricLabel">Rollout (m)</span></h3>
+      <div class="legend" style="margin-bottom: 6px;">
+        <div class="legend-item"><div class="legend-swatch" style="border-left: 3px solid var(--green);"></div> Low chain angle</div>
+        <div class="legend-item"><div class="legend-swatch" style="border-left: 3px solid var(--amber);"></div> Moderate angle</div>
+        <div class="legend-item"><div class="legend-swatch" style="border-left: 3px solid var(--red);"></div> High angle</div>
+        <div class="legend-item"><div class="legend-swatch" style="background: var(--light-red);"></div> Over rollout limit</div>
+        <div class="legend-item"><div class="legend-swatch" style="background: #f3f4f6; text-decoration: line-through;"></div> Blocked</div>
+        <div class="legend-item"><div class="legend-swatch" style="box-shadow: inset 0 0 0 2px var(--accent);"></div> Max gear</div>
+      </div>
+      <div style="overflow-x: auto;">
+        <table class="gear-table" id="gearTable"></table>
+      </div>
+      <hr class="section-sep">
+      <h3>Speed at <span id="cadenceLabel">90</span> RPM</h3>
+      <div class="speed-chart">
+        <div class="speed-bar-container" id="speedChart"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+// Gather all inputs for change listeners
+const inputIds = ['wheelCirc','chainstay','chainlineInner','chainlineOuter','hubOLD',
+  'locknutToCog','cogPitch','rolloutLimit','maxBlock','chainrings','cassette',
+  'cadence','displayMetric','angleWarn','angleDanger'];
+
+inputIds.forEach(id => {
+  $(id).addEventListener('input', () => { clearTimeout(window._debounce); window._debounce = setTimeout(recalculate, 150); });
+});
+
+function setWheel(v) { $('wheelCirc').value = v; recalculate(); }
+function setLimit(v) { $('rolloutLimit').value = v; recalculate(); }
+function setCassette(v) { $('cassette').value = v; recalculate(); }
+
+function parseList(id) {
+  const arr = $(id).value.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n) && n > 0);
+  return [...new Set(arr)].sort((a,b) => a - b);
+}
+
+function calcRollout(chainring, cog, wheelCircMm) {
+  return (chainring / cog) * (wheelCircMm / 1000);
+}
+
+function calcSpeed(chainring, cog, wheelCircMm, cadence) {
+  // speed in km/h = (chainring/cog) * wheelCirc_m * cadence * 60 / 1000
+  return (chainring / cog) * (wheelCircMm / 1000) * cadence * 60 / 1000;
+}
+
+function calcGearInches(chainring, cog) {
+  // gear inches = (chainring/cog) * 27 (nominal 27" wheel)
+  return (chainring / cog) * 27;
+}
+
+function calcChainAngle(chainringPos, cogPos, chainstay) {
+  const offset = Math.abs(chainringPos - cogPos);
+  return Math.atan(offset / chainstay) * (180 / Math.PI);
+}
+
+function cogPositionFromCentreline(cogIndex, numCogs, hubOLD, locknutToCog, cogPitch) {
+  // cogIndex 0 = smallest (outermost), numCogs-1 = largest (innermost)
+  // outermost cog is at hubOLD/2 - locknutToCog from centreline
+  const outermost = hubOLD / 2 - locknutToCog;
+  return outermost - cogIndex * cogPitch;
+}
+
+function chainringPosition(chainring, chainringSizes, chainlineInner, chainlineOuter) {
+  // If only one ring, use outer position
+  if (chainringSizes.length <= 1) return chainlineOuter;
+  // Determine if this is the inner (smallest) or outer (largest)
+  const sorted = [...chainringSizes].sort((a,b) => a - b);
+  const idx = sorted.indexOf(chainring);
+  if (idx === -1) return chainlineOuter;
+  if (sorted.length === 2) {
+    return idx === 0 ? chainlineInner : chainlineOuter;
+  }
+  // For >2, interpolate
+  const frac = idx / (sorted.length - 1);
+  return chainlineInner + frac * (chainlineOuter - chainlineInner);
+}
+
+let selectedConfig = null;
+
+function recalculate() {
+  const wheelCirc = parseFloat($('wheelCirc').value) || 2109;
+  const chainstay = parseFloat($('chainstay').value) || 410;
+  const chainlineInner = parseFloat($('chainlineInner').value) || 41;
+  const chainlineOuter = parseFloat($('chainlineOuter').value) || 46;
+  const hubOLD = parseFloat($('hubOLD').value) || 130;
+  const locknutToCog = parseFloat($('locknutToCog').value) || 3.5;
+  const cogPitch = parseFloat($('cogPitch').value) || 3.95;
+  const rolloutLimit = parseFloat($('rolloutLimit').value) || 6.73;
+  const maxBlock = parseInt($('maxBlock').value) || 0;
+  const cadence = parseInt($('cadence').value) || 90;
+  const angleWarn = parseFloat($('angleWarn').value) || 1.5;
+  const angleDanger = parseFloat($('angleDanger').value) || 2.5;
+  const displayMetric = $('displayMetric').value;
+
+  const chainrings = parseList('chainrings');
+  const cogs = parseList('cassette'); // sorted ascending (smallest first)
+
+  if (chainrings.length === 0 || cogs.length === 0) return;
+
+  // For each chainring, find the best blocking configuration
+  const configs = [];
+
+  for (const ring of chainrings) {
+    // Try blocking 0, 1, 2, ... maxBlock cogs from the smallest end
+    for (let block = 0; block <= maxBlock && block < cogs.length; block++) {
+      const availableCogs = cogs.slice(block); // remove 'block' smallest cogs
+      const smallestAvail = availableCogs[0];
+      const maxRollout = calcRollout(ring, smallestAvail, wheelCirc);
+
+      if (maxRollout <= rolloutLimit) {
+        configs.push({
+          chainring: ring,
+          blocked: block,
+          smallestAvail,
+          availableCogs,
+          blockedCogs: cogs.slice(0, block),
+          maxRollout,
+          gap: rolloutLimit - maxRollout,
+          gapPct: ((rolloutLimit - maxRollout) / rolloutLimit) * 100
+        });
+        break; // Take the first (fewest blocks) that's legal — this maximises rollout
+      }
+    }
+  }
+
+  // Sort by gap ascending (closest to limit first)
+  configs.sort((a, b) => a.gap - b.gap);
+
+  // Render ranking table
+  const tbody = $('rankingBody');
+  tbody.innerHTML = '';
+
+  configs.forEach((cfg, i) => {
+    const tr = document.createElement('tr');
+    const rankClass = i < 3 ? `rank-${i+1}` : '';
+
+    // Speed at ideal (limit) rollout vs this config's max rollout, at the given cadence
+    const idealSpeed = rolloutLimit * cadence * 60 / 1000; // km/h
+    const cfgSpeed = cfg.maxRollout * cadence * 60 / 1000; // km/h
+    const speedLoss = idealSpeed - cfgSpeed; // km/h lost
+    // Distance lost per km: at max cadence, the rider covers cfg.maxRollout per crank rev instead of rolloutLimit
+    // Over 1km, extra crank revolutions needed = 1000/cfg.maxRollout - 1000/rolloutLimit
+    // Equivalently, distance lost = 1000 * (1 - cfg.maxRollout/rolloutLimit) metres per km
+    const distLossPerKm = 1000 * (1 - cfg.maxRollout / rolloutLimit);
+
+    tr.innerHTML = `
+      <td><span class="rank-badge ${rankClass}">${i+1}</span></td>
+      <td><strong>${cfg.chainring}T</strong></td>
+      <td>${cfg.blocked === 0 ? 'None' : cfg.blockedCogs.map(c => c+'T').join(', ')}</td>
+      <td>${cfg.smallestAvail}T</td>
+      <td><strong>${cfg.maxRollout.toFixed(3)}m</strong></td>
+      <td>${cfg.gap.toFixed(3)}m (${cfg.gapPct.toFixed(1)}%)</td>
+      <td style="color: ${speedLoss < 0.5 ? 'var(--green)' : speedLoss < 1.5 ? 'var(--amber)' : 'var(--red)'}">${speedLoss > 0 ? '-' : ''}${speedLoss.toFixed(1)} km/h</td>
+      <td style="color: ${distLossPerKm < 5 ? 'var(--green)' : distLossPerKm < 15 ? 'var(--amber)' : 'var(--red)'}">${distLossPerKm.toFixed(1)}m</td>
+      <td style="width: 120px;">
+        <div class="rollout-bar" style="background: #e5e7eb;">
+          <div class="rollout-bar-fill" style="width: ${(cfg.maxRollout / rolloutLimit * 100).toFixed(1)}%; background: ${cfg.gapPct < 1 ? 'var(--green)' : cfg.gapPct < 3 ? 'var(--amber)' : 'var(--red)'};"></div>
+        </div>
+      </td>
+    `;
+
+    const configKey = `${cfg.chainring}-${cfg.blocked}`;
+    if (selectedConfig === configKey) tr.classList.add('selected');
+
+    tr.addEventListener('click', () => {
+      selectedConfig = configKey;
+      recalculate();
+      showDetail(cfg, chainrings, cogs, wheelCirc, chainstay, chainlineInner, chainlineOuter, hubOLD, locknutToCog, cogPitch, rolloutLimit, cadence, angleWarn, angleDanger, displayMetric);
+    });
+
+    tbody.appendChild(tr);
+  });
+
+  // Auto-select first if none selected, or re-render selected
+  const activeCfg = configs.find(c => `${c.chainring}-${c.blocked}` === selectedConfig) || configs[0];
+  if (activeCfg) {
+    selectedConfig = `${activeCfg.chainring}-${activeCfg.blocked}`;
+    // Mark selected row
+    const rows = tbody.querySelectorAll('tr');
+    rows.forEach((r, i) => {
+      if (`${configs[i].chainring}-${configs[i].blocked}` === selectedConfig) r.classList.add('selected');
+    });
+    showDetail(activeCfg, chainrings, cogs, wheelCirc, chainstay, chainlineInner, chainlineOuter, hubOLD, locknutToCog, cogPitch, rolloutLimit, cadence, angleWarn, angleDanger, displayMetric);
+  }
+}
+
+function showDetail(cfg, allChainrings, allCogs, wheelCirc, chainstay, chainlineInner, chainlineOuter, hubOLD, locknutToCog, cogPitch, rolloutLimit, cadence, angleWarn, angleDanger, displayMetric) {
+  const panel = $('detailPanel');
+  panel.style.display = '';
+
+  // We show a 2-row gear table: inner ring (smallest chainring from the pair) and outer ring (selected chainring)
+  // Determine the inner ring — use the next-smallest chainring from the user's list
+  const sorted = [...allChainrings].sort((a,b) => a - b);
+  const innerRing = sorted.findLast(r => r < cfg.chainring) || null;
+  const outerRing = cfg.chainring;
+  const rings = innerRing ? [innerRing, outerRing] : [outerRing];
+
+  $('detailTitle').textContent = innerRing ? `${innerRing}/${outerRing}T Chainrings` : `${outerRing}T Chainring`;
+  $('detailSubtitle').textContent = cfg.blocked > 0
+    ? `Blocking ${cfg.blockedCogs.map(c=>c+'T').join(', ')} — smallest available: ${cfg.smallestAvail}T`
+    : `No cogs blocked — smallest available: ${cfg.smallestAvail}T`;
+
+  // Metric cards
+  const maxSpeed = calcSpeed(outerRing, cfg.smallestAvail, wheelCirc, cadence);
+  const minGear = innerRing
+    ? calcRollout(innerRing, allCogs[allCogs.length-1], wheelCirc)
+    : calcRollout(outerRing, allCogs[allCogs.length-1], wheelCirc);
+  const gearRange = cfg.maxRollout / minGear;
+
+  const gapClass = cfg.gapPct < 1 ? 'good' : cfg.gapPct < 3 ? 'ok' : 'bad';
+
+  // Count only legal, non-blocked gears
+  let usableCount = 0;
+  rings.forEach(ring => {
+    cfg.availableCogs.forEach(cog => {
+      if (calcRollout(ring, cog, wheelCirc) <= rolloutLimit) usableCount++;
+    });
+  });
+
+  $('metricCards').innerHTML = `
+    <div class="metric-card ${gapClass}"><div class="value">${cfg.maxRollout.toFixed(3)}m</div><div class="label">Max Rollout</div></div>
+    <div class="metric-card ${gapClass}"><div class="value">${cfg.gap.toFixed(3)}m</div><div class="label">Gap to Limit</div></div>
+    <div class="metric-card"><div class="value">${maxSpeed.toFixed(1)}</div><div class="label">Top km/h @ ${cadence}rpm</div></div>
+    <div class="metric-card"><div class="value">${minGear.toFixed(2)}m</div><div class="label">Lowest Gear</div></div>
+    <div class="metric-card"><div class="value">${gearRange.toFixed(1)}×</div><div class="label">Gear Range</div></div>
+    <div class="metric-card"><div class="value">${usableCount}</div><div class="label">Legal Gears</div></div>
+  `;
+
+  // Gear table
+  const metricLabels = {
+    rollout: 'Rollout (m)', speed: `Speed @ ${cadence}rpm (km/h)`, ratio: 'Gear Ratio', inches: 'Gear Inches'
+  };
+  $('gearTableMetricLabel').textContent = metricLabels[displayMetric];
+
+  const table = $('gearTable');
+  let html = '<thead><tr><th>Ring \\ Cog</th>';
+  allCogs.forEach(cog => {
+    html += `<th>${cog}T</th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  const allGears = []; // for speed chart
+
+  rings.forEach(ring => {
+    const ringPos = chainringPosition(ring, [innerRing || outerRing, outerRing], chainlineInner, chainlineOuter);
+    html += `<tr><td>${ring}T ${ring === outerRing ? '(outer)' : '(inner)'}</td>`;
+
+    allCogs.forEach((cog, cogIdx) => {
+      const rollout = calcRollout(ring, cog, wheelCirc);
+      const speed = calcSpeed(ring, cog, wheelCirc, cadence);
+      const ratio = ring / cog;
+      const inches = calcGearInches(ring, cog);
+      const cogPos = cogPositionFromCentreline(cogIdx, allCogs.length, hubOLD, locknutToCog, cogPitch);
+      const angle = calcChainAngle(ringPos, cogPos, chainstay);
+
+      const isBlocked = cfg.blockedCogs.includes(cog);
+      const isOverLimit = rollout > rolloutLimit;
+      const isMaxGear = (ring === outerRing && cog === cfg.smallestAvail);
+
+      let angleClass = angle < angleWarn ? 'angle-green' : angle < angleDanger ? 'angle-amber' : 'angle-red';
+      let cellClass = 'gear-cell ' + angleClass;
+      if (isBlocked) cellClass = 'gear-cell blocked';
+      if (isOverLimit && !isBlocked) cellClass += ' over-limit';
+      if (isMaxGear) cellClass += ' max-gear';
+
+      let displayVal, detail;
+      switch (displayMetric) {
+        case 'rollout': displayVal = rollout.toFixed(2); detail = `${angle.toFixed(1)}°`; break;
+        case 'speed': displayVal = speed.toFixed(1); detail = `${angle.toFixed(1)}°`; break;
+        case 'ratio': displayVal = ratio.toFixed(2); detail = `${angle.toFixed(1)}°`; break;
+        case 'inches': displayVal = inches.toFixed(1); detail = `${angle.toFixed(1)}°`; break;
+      }
+
+      html += `<td><div class="${cellClass}"><div class="rollout">${displayVal}</div><div class="detail">${detail}</div></div></td>`;
+
+      if (!isBlocked) {
+        allGears.push({ ring, cog, rollout, speed, angle, isOverLimit, isMaxGear });
+      }
+    });
+
+    html += '</tr>';
+  });
+
+  html += '</tbody>';
+  table.innerHTML = html;
+
+  // Speed chart
+  $('cadenceLabel').textContent = cadence;
+  const chart = $('speedChart');
+  chart.innerHTML = '';
+
+  // Sort gears by rollout for the chart
+  allGears.sort((a, b) => a.rollout - b.rollout);
+  const maxSpeedAll = Math.max(...allGears.map(g => g.speed));
+
+  allGears.forEach(g => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'speed-bar-wrapper';
+
+    const bar = document.createElement('div');
+    bar.className = 'speed-bar';
+    const heightPct = (g.speed / maxSpeedAll * 85);
+    bar.style.height = heightPct + '%';
+
+    let color;
+    if (g.isOverLimit) color = '#fca5a5';
+    else if (g.angle >= angleDanger) color = 'var(--amber)';
+    else color = 'var(--accent)';
+    bar.style.background = color;
+
+    const valEl = document.createElement('div');
+    valEl.className = 'speed-bar-value';
+    valEl.textContent = g.speed.toFixed(0);
+    bar.appendChild(valEl);
+
+    const label = document.createElement('div');
+    label.className = 'speed-bar-label';
+    label.textContent = `${g.ring}/${g.cog}`;
+
+    wrapper.appendChild(bar);
+    wrapper.appendChild(label);
+    chart.appendChild(wrapper);
+  });
+}
+
+// Initial calculation
+recalculate();
+</script>
+</body>
+</html>
