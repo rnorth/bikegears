@@ -31,6 +31,7 @@
   .input-group { margin-bottom: 12px; }
   .input-group label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 3px; color: var(--muted); }
   .input-group input, .input-group select { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 0.9rem; }
+  .input-group input[type="checkbox"] { width: auto; }
   .input-group input:focus, .input-group select:focus { outline: none; border-color: var(--accent); }
   .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .help { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
@@ -181,6 +182,13 @@
         <label>Chain Angle Danger Threshold (°)</label>
         <input type="number" id="angleDanger" value="2.5" step="0.1">
       </div>
+      <div class="input-group">
+        <label style="display: flex !important; align-items: flex-start; gap: 6px; cursor: pointer; font-weight: normal; color: var(--text);">
+          <input type="checkbox" id="excludeHighAngle" checked style="flex-shrink: 0; margin-top: 3px;">
+          <span>Exclude high-angle gears from rollout calc</span>
+        </label>
+        <div class="help">When checked, gear combos exceeding the danger threshold are not considered for max rollout</div>
+      </div>
     </div>
 
     <div class="panel">
@@ -277,7 +285,7 @@ const $ = id => document.getElementById(id);
 // Gather all inputs for change listeners
 const inputIds = ['wheelCirc','chainstay','chainlineInner','chainlineOuter','hubOLD',
   'locknutToCog','cogPitch','rolloutLimit','maxBlock','chainrings','cassette',
-  'cadence','displayMetric','angleWarn','angleDanger'];
+  'cadence','displayMetric','angleWarn','angleDanger','excludeHighAngle'];
 
 inputIds.forEach(id => {
   $(id).addEventListener('input', () => { clearTimeout(window._debounce); window._debounce = setTimeout(recalculate, 150); });
@@ -348,6 +356,7 @@ function recalculate() {
   const cadence = parseInt($('cadence').value) || 90;
   const angleWarn = parseFloat($('angleWarn').value) || 1.5;
   const angleDanger = parseFloat($('angleDanger').value) || 2.5;
+  const excludeHighAngle = $('excludeHighAngle').checked;
   const displayMetric = $('displayMetric').value;
 
   const chainrings = parseList('chainrings');
@@ -359,19 +368,40 @@ function recalculate() {
   const configs = [];
 
   for (const ring of chainrings) {
+    // Use this chainring's actual physical position on the crankset
+    const ringPos = chainringPosition(ring, chainrings, chainlineInner, chainlineOuter);
+
     // Try blocking 0, 1, 2, ... maxBlock cogs from the smallest end
     for (let block = 0; block <= maxBlock && block < cogs.length; block++) {
       const availableCogs = cogs.slice(block); // remove 'block' smallest cogs
-      const smallestAvail = availableCogs[0];
-      const maxRollout = calcRollout(ring, smallestAvail, wheelCirc);
+
+      // Find the smallest available cog that's within the angle threshold
+      let effectiveSmallest = null;
+      const angleExcludedCogs = [];
+      for (const cog of availableCogs) {
+        const cogPos = cogPositionFromCentreline(cogs.indexOf(cog), cogs.length, hubOLD, locknutToCog, cogPitch);
+        const angle = calcChainAngle(ringPos, cogPos, chainstay);
+        if (!excludeHighAngle || angle < angleDanger) {
+          effectiveSmallest = cog;
+          break;
+        }
+        angleExcludedCogs.push(cog);
+      }
+
+      if (effectiveSmallest === null) continue; // all remaining cogs exceed angle threshold
+
+      const maxRollout = calcRollout(ring, effectiveSmallest, wheelCirc);
 
       if (maxRollout <= rolloutLimit) {
+        const physicallyBlocked = cogs.slice(0, block);
         configs.push({
           chainring: ring,
           blocked: block,
-          smallestAvail,
+          smallestAvail: effectiveSmallest,
           availableCogs,
-          blockedCogs: cogs.slice(0, block),
+          blockedCogs: physicallyBlocked,
+          angleExcludedCogs,
+          allExcludedCogs: [...physicallyBlocked, ...angleExcludedCogs],
           maxRollout,
           gap: rolloutLimit - maxRollout,
           gapPct: ((rolloutLimit - maxRollout) / rolloutLimit) * 100
@@ -404,7 +434,11 @@ function recalculate() {
     tr.innerHTML = `
       <td><span class="rank-badge ${rankClass}">${i+1}</span></td>
       <td><strong>${cfg.chainring}T</strong></td>
-      <td>${cfg.blocked === 0 ? 'None' : cfg.blockedCogs.map(c => c+'T').join(', ')}</td>
+      <td>${cfg.allExcludedCogs.length === 0 ? 'None' :
+        (cfg.blockedCogs.length > 0 ? cfg.blockedCogs.map(c => c+'T').join(', ') : '') +
+        (cfg.blockedCogs.length > 0 && cfg.angleExcludedCogs.length > 0 ? ', ' : '') +
+        (cfg.angleExcludedCogs.length > 0 ? '<span style="color:var(--red)" title="Excluded due to chain angle">' + cfg.angleExcludedCogs.map(c => c+'T').join(', ') + '</span>' : '')
+      }</td>
       <td>${cfg.smallestAvail}T</td>
       <td><strong>${cfg.maxRollout.toFixed(3)}m</strong></td>
       <td>${cfg.gap.toFixed(3)}m (${cfg.gapPct.toFixed(1)}%)</td>
@@ -423,7 +457,7 @@ function recalculate() {
     tr.addEventListener('click', () => {
       selectedConfig = configKey;
       recalculate();
-      showDetail(cfg, chainrings, cogs, wheelCirc, chainstay, chainlineInner, chainlineOuter, hubOLD, locknutToCog, cogPitch, rolloutLimit, cadence, angleWarn, angleDanger, displayMetric);
+      showDetail(cfg, chainrings, cogs, wheelCirc, chainstay, chainlineInner, chainlineOuter, hubOLD, locknutToCog, cogPitch, rolloutLimit, cadence, angleWarn, angleDanger, displayMetric, excludeHighAngle);
     });
 
     tbody.appendChild(tr);
@@ -442,7 +476,7 @@ function recalculate() {
   }
 }
 
-function showDetail(cfg, allChainrings, allCogs, wheelCirc, chainstay, chainlineInner, chainlineOuter, hubOLD, locknutToCog, cogPitch, rolloutLimit, cadence, angleWarn, angleDanger, displayMetric) {
+function showDetail(cfg, allChainrings, allCogs, wheelCirc, chainstay, chainlineInner, chainlineOuter, hubOLD, locknutToCog, cogPitch, rolloutLimit, cadence, angleWarn, angleDanger, displayMetric, excludeHighAngle) {
   const panel = $('detailPanel');
   panel.style.display = '';
 
@@ -467,11 +501,16 @@ function showDetail(cfg, allChainrings, allCogs, wheelCirc, chainstay, chainline
 
   const gapClass = cfg.gapPct < 1 ? 'good' : cfg.gapPct < 3 ? 'ok' : 'bad';
 
-  // Count only legal, non-blocked gears
+  // Count only legal, non-blocked gears (respecting chain angle exclusion)
   let usableCount = 0;
   rings.forEach(ring => {
-    cfg.availableCogs.forEach(cog => {
-      if (calcRollout(ring, cog, wheelCirc) <= rolloutLimit) usableCount++;
+    const rPos = chainringPosition(ring, allChainrings, chainlineInner, chainlineOuter);
+    cfg.availableCogs.forEach((cog, i) => {
+      const cogIdx = allCogs.indexOf(cog);
+      const cPos = cogPositionFromCentreline(cogIdx, allCogs.length, hubOLD, locknutToCog, cogPitch);
+      const ang = calcChainAngle(rPos, cPos, chainstay);
+      if (calcRollout(ring, cog, wheelCirc) <= rolloutLimit &&
+          (!excludeHighAngle || ang < angleDanger)) usableCount++;
     });
   });
 
@@ -500,7 +539,7 @@ function showDetail(cfg, allChainrings, allCogs, wheelCirc, chainstay, chainline
   const allGears = []; // for speed chart
 
   rings.forEach(ring => {
-    const ringPos = chainringPosition(ring, [innerRing || outerRing, outerRing], chainlineInner, chainlineOuter);
+    const ringPos = chainringPosition(ring, allChainrings, chainlineInner, chainlineOuter);
     html += `<tr><td>${ring}T ${ring === outerRing ? '(outer)' : '(inner)'}</td>`;
 
     allCogs.forEach((cog, cogIdx) => {
