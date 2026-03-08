@@ -6,6 +6,6 @@ description = "Copy source files into public/"
 run = "cp gear-calculator.html public/index.html"
 
 [tasks.deploy]
-description = "Build and deploy to Cloudflare Workers"
+description = "Build and deploy to Cloudflare Pages"
 depends = ["build"]
-run = "wrangler deploy"
+run = "wrangler pages deploy public --project-name=bikegears --branch=main"
