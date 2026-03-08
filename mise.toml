@@ -1,0 +1,11 @@
+[tools]
+wrangler = "4.65.0"
+
+[tasks.build]
+description = "Copy source files into public/"
+run = "cp gear-calculator.html public/index.html"
+
+[tasks.deploy]
+description = "Build and deploy to Cloudflare Workers"
+depends = ["build"]
+run = "wrangler deploy"
