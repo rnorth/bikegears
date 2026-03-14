@@ -39,6 +39,7 @@
   .presets { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
   .presets button { font-size: 0.7rem; padding: 2px 6px; border: 1px solid var(--border); border-radius: 3px; background: var(--bg); cursor: pointer; }
   .presets button:hover { border-color: var(--accent); color: var(--accent); }
+  .presets button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
   .results { display: flex; flex-direction: column; gap: 16px; }
 
@@ -120,11 +121,11 @@
         <label>Wheel Circumference (mm)</label>
         <input type="number" id="wheelCirc" value="2109" step="1">
         <div class="help">700c × 25mm ≈ 2109mm</div>
-        <div class="presets">
-          <button onclick="setWheel(2096)">700×23</button>
-          <button onclick="setWheel(2109)">700×25</button>
-          <button onclick="setWheel(2127)">700×28</button>
-          <button onclick="setWheel(2079)">700×20</button>
+        <div class="presets" data-input="wheelCirc">
+          <button onclick="setWheel(2096)" data-preset="2096">700×23</button>
+          <button onclick="setWheel(2109)" data-preset="2109">700×25</button>
+          <button onclick="setWheel(2127)" data-preset="2127">700×28</button>
+          <button onclick="setWheel(2079)" data-preset="2079">700×20</button>
         </div>
       </div>
     </div>
@@ -134,10 +135,10 @@
       <div class="input-group">
         <label>Rollout Limit (m)</label>
         <input type="number" id="rolloutLimit" value="6.73" step="0.01">
-        <div class="presets">
-          <button onclick="setLimit(6.34)">Youth C</button>
-          <button onclick="setLimit(6.73)">Youth B</button>
-          <button onclick="setLimit(7.18)">Youth A</button>
+        <div class="presets" data-input="rolloutLimit">
+          <button onclick="setLimit(6.34)" data-preset="6.34">Youth C</button>
+          <button onclick="setLimit(6.73)" data-preset="6.73">Youth B</button>
+          <button onclick="setLimit(7.18)" data-preset="7.18">Youth A</button>
         </div>
       </div>
       <div class="input-group">
@@ -156,14 +157,14 @@
       <div class="input-group">
         <label>Cassette (comma separated cog teeth)</label>
         <input type="text" id="cassette" value="11, 12, 13, 14, 15, 17, 19, 21, 24, 28">
-        <div class="presets">
-          <button onclick="setCassette('11,12,13,14,15,17,19,21,23,25')">11-25</button>
-          <button onclick="setCassette('11,12,13,14,15,17,19,21,24,28')">11-28</button>
-          <button onclick="setCassette('11,12,13,15,17,19,21,23,26,30')">11-30</button>
-          <button onclick="setCassette('11,13,15,17,19,21,23,25,28,32')">11-32</button>
-          <button onclick="setCassette('11,13,15,17,19,21,24,28,32,36')">11-36</button>
-          <button onclick="setCassette('12,13,14,15,16,17,19,21,23,25')">12-25</button>
-          <button onclick="setCassette('12,13,14,15,16,17,19,21,24,28')">12-28</button>
+        <div class="presets" data-input="cassette">
+          <button onclick="setCassette('11,12,13,14,15,17,19,21,23,25')" data-preset="11,12,13,14,15,17,19,21,23,25">11-25</button>
+          <button onclick="setCassette('11,12,13,14,15,17,19,21,24,28')" data-preset="11,12,13,14,15,17,19,21,24,28">11-28</button>
+          <button onclick="setCassette('11,12,13,15,17,19,21,23,26,30')" data-preset="11,12,13,15,17,19,21,23,26,30">11-30</button>
+          <button onclick="setCassette('11,13,15,17,19,21,23,25,28,32')" data-preset="11,13,15,17,19,21,23,25,28,32">11-32</button>
+          <button onclick="setCassette('11,13,15,17,19,21,24,28,32,36')" data-preset="11,13,15,17,19,21,24,28,32,36">11-36</button>
+          <button onclick="setCassette('12,13,14,15,16,17,19,21,23,25')" data-preset="12,13,14,15,16,17,19,21,23,25">12-25</button>
+          <button onclick="setCassette('12,13,14,15,16,17,19,21,24,28')" data-preset="12,13,14,15,16,17,19,21,24,28">12-28</button>
         </div>
       </div>
       <div class="input-group">
@@ -303,6 +304,18 @@ inputIds.forEach(id => {
 function setWheel(v) { $('wheelCirc').value = v; recalculate(); }
 function setLimit(v) { $('rolloutLimit').value = v; recalculate(); }
 function setCassette(v) { $('cassette').value = v; recalculate(); }
+
+function updatePresetHighlights() {
+  document.querySelectorAll('.presets[data-input]').forEach(group => {
+    const input = $(group.dataset.input);
+    const isNumber = input.type === 'number';
+    const currentVal = isNumber ? parseFloat(input.value) : input.value.replace(/\s+/g, '');
+    group.querySelectorAll('button[data-preset]').forEach(btn => {
+      const presetVal = isNumber ? parseFloat(btn.dataset.preset) : btn.dataset.preset.replace(/\s+/g, '');
+      btn.classList.toggle('active', currentVal === presetVal);
+    });
+  });
+}
 
 function parseList(id) {
   const arr = $(id).value.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n) && n > 0);
@@ -483,6 +496,7 @@ function recalculate() {
     });
     showDetail(activeCfg, chainrings, cogs, wheelCirc, chainstay, chainlineInner, chainlineOuter, hubOLD, locknutToCog, cogPitch, rolloutLimit, cadence, angleWarn, angleDanger, displayMetric);
   }
+  updatePresetHighlights();
 }
 
 function showDetail(cfg, allChainrings, allCogs, wheelCirc, chainstay, chainlineInner, chainlineOuter, hubOLD, locknutToCog, cogPitch, rolloutLimit, cadence, angleWarn, angleDanger, displayMetric, excludeHighAngle) {
