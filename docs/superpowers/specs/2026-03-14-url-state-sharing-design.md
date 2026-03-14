@@ -49,7 +49,7 @@ Two buttons placed in the header area near the subtitle.
 1. Serialize all inputs to hash params
 2. Set `window.location.hash`
 3. Copy full URL to clipboard via `navigator.clipboard.writeText()`
-4. Show brief "Copied!" feedback (text change on button, reverts after ~2 seconds)
+4. Show brief "Copied to clipboard!" feedback (text change on button, reverts after ~2 seconds)
 
 ### Save Button
 1. Serialize all inputs to hash params

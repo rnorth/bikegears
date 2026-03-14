@@ -98,6 +98,10 @@
 
   .config-name { font-weight: 600; font-size: 0.85rem; }
   .config-detail { font-size: 0.75rem; color: var(--muted); }
+  .share-save-buttons { display: flex; gap: 8px; margin-top: 8px; }
+  .share-save-buttons button { font-size: 0.8rem; padding: 5px 12px; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; background: var(--card); color: var(--text); transition: background 0.15s, color 0.15s; }
+  .share-save-buttons button:hover { border-color: var(--accent); color: var(--accent); }
+
   .disclaimer { background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 6px; padding: 10px 14px; font-size: 0.8rem; color: var(--muted); margin-bottom: 16px; }
   .disclaimer strong { display: block; margin-bottom: 2px; color: var(--text); }
   .footer { margin-top: 24px; text-align: center; font-size: 0.75rem; color: var(--muted); }
@@ -107,6 +111,10 @@
 
 <h1>Youth Bike Gear Calculator</h1>
 <p class="subtitle">Optimise gearing for rollout-restricted racing. Click a configuration in the ranking to see its full gear table.</p>
+<div class="share-save-buttons">
+  <button id="shareBtn" onclick="shareConfig()">Share</button>
+  <button id="saveBtn" onclick="saveConfig()">Save</button>
+</div>
 
 <div class="disclaimer">
   <strong>Disclaimer</strong>
@@ -291,6 +299,81 @@
 
 <script>
 const $ = id => document.getElementById(id);
+
+// URL hash parameter mapping: [shortKey, inputId, type]
+// type: 'n' = number, 's' = string, 'c' = checkbox (1/0), 'l' = comma-separated list
+const hashKeyMap = [
+  ['wc', 'wheelCirc', 'n'],
+  ['rl', 'rolloutLimit', 'n'],
+  ['mb', 'maxBlock', 'n'],
+  ['cr', 'chainrings', 'l'],
+  ['cs', 'cassette', 'l'],
+  ['cd', 'cadence', 'n'],
+  ['dm', 'displayMetric', 's'],
+  ['aw', 'angleWarn', 'n'],
+  ['ad', 'angleDanger', 'n'],
+  ['eh', 'excludeHighAngle', 'c'],
+  ['cl', 'chainstay', 'n'],
+  ['ci', 'chainlineInner', 'n'],
+  ['co', 'chainlineOuter', 'n'],
+  ['ho', 'hubOLD', 'n'],
+  ['lc', 'locknutToCog', 'n'],
+  ['cp', 'cogPitch', 'n'],
+];
+
+function serializeToHash() {
+  const params = hashKeyMap.map(([key, id, type]) => {
+    const el = $(id);
+    const val = type === 'c' ? (el.checked ? '1' : '0') :
+                type === 'l' ? el.value.replace(/\s+/g, '') :
+                el.value;
+    return key + '=' + encodeURIComponent(val);
+  });
+  window.location.hash = params.join('&');
+}
+
+function loadFromHash() {
+  const hash = window.location.hash.slice(1);
+  if (!hash) return;
+  const params = new URLSearchParams(hash);
+  hashKeyMap.forEach(([key, id, type]) => {
+    if (!params.has(key)) return;
+    const val = params.get(key);
+    const el = $(id);
+    if (type === 'c') {
+      el.checked = val === '1';
+    } else {
+      el.value = val;
+    }
+  });
+}
+
+function shareConfig() {
+  serializeToHash();
+  navigator.clipboard.writeText(window.location.href).then(() => {
+    const btn = $('shareBtn');
+    btn.textContent = 'Copied to clipboard!';
+    setTimeout(() => { btn.textContent = 'Share'; }, 2000);
+  });
+}
+
+function saveConfig() {
+  serializeToHash();
+  const btn = $('saveBtn');
+  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+  btn.textContent = 'Bookmark this page (' + (isMac ? '\u2318' : 'Ctrl+') + 'D)';
+  setTimeout(() => { btn.textContent = 'Save'; }, 3000);
+}
+
+function updatePageTitle() {
+  const cogs = parseList('cassette');
+  const limit = parseFloat($('rolloutLimit').value);
+  const category = limit === 7.18 ? 'Youth A' : limit === 6.73 ? 'Youth B' : limit === 6.34 ? 'Youth C' : limit + 'm';
+  const cogRange = cogs.length ? cogs[0] + '-' + cogs[cogs.length - 1] : '';
+  const selRow = document.querySelector('.ranking-table tr.selected');
+  const chainring = selRow ? selRow.querySelector('td:nth-child(2)').textContent.trim() : (parseList('chainrings').pop() || '') + 'T';
+  document.title = 'Youth Bike Gear Calculator \u2014 ' + chainring + ', ' + cogRange + ', ' + category;
+}
 
 // Gather all inputs for change listeners
 const inputIds = ['wheelCirc','chainstay','chainlineInner','chainlineOuter','hubOLD',
@@ -497,6 +580,7 @@ function recalculate() {
     showDetail(activeCfg, chainrings, cogs, wheelCirc, chainstay, chainlineInner, chainlineOuter, hubOLD, locknutToCog, cogPitch, rolloutLimit, cadence, angleWarn, angleDanger, displayMetric);
   }
   updatePresetHighlights();
+  updatePageTitle();
 }
 
 function showDetail(cfg, allChainrings, allCogs, wheelCirc, chainstay, chainlineInner, chainlineOuter, hubOLD, locknutToCog, cogPitch, rolloutLimit, cadence, angleWarn, angleDanger, displayMetric, excludeHighAngle) {
@@ -643,7 +727,8 @@ function showDetail(cfg, allChainrings, allCogs, wheelCirc, chainstay, chainline
   });
 }
 
-// Initial calculation
+// Load settings from URL hash (if present), then run initial calculation
+loadFromHash();
 recalculate();
 </script>
 
