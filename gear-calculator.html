@@ -161,6 +161,17 @@
       <div class="input-group">
         <label>Chainring Sizes (comma separated)</label>
         <input type="text" id="chainrings" value="34, 36, 38, 39, 40, 42, 44, 46, 48, 50">
+        <div class="presets" data-input="chainrings">
+          <button onclick="setChainrings('34,50')" data-preset="34,50">50/34</button>
+          <button onclick="setChainrings('36,52')" data-preset="36,52">52/36</button>
+          <button onclick="setChainrings('39,53')" data-preset="39,53">53/39</button>
+          <button onclick="setChainrings('34,48')" data-preset="34,48">48/34</button>
+          <button onclick="setChainrings('34,46')" data-preset="34,46">46/34</button>
+          <button onclick="setChainrings('42')" data-preset="42">1x 42T</button>
+          <button onclick="setChainrings('44')" data-preset="44">1x 44T</button>
+          <button onclick="setChainrings('46')" data-preset="46">1x 46T</button>
+          <button onclick="setChainrings('34,36,38,39,40,42,44,46,48,50')" data-preset="34,36,38,39,40,42,44,46,48,50">Many options (what-if)</button>
+        </div>
       </div>
       <div class="input-group">
         <label>Cassette (comma separated cog teeth)</label>
@@ -387,6 +398,7 @@ inputIds.forEach(id => {
 function setWheel(v) { $('wheelCirc').value = v; recalculate(); }
 function setLimit(v) { $('rolloutLimit').value = v; recalculate(); }
 function setCassette(v) { $('cassette').value = v; recalculate(); }
+function setChainrings(v) { $('chainrings').value = v; recalculate(); }
 
 function updatePresetHighlights() {
   document.querySelectorAll('.presets[data-input]').forEach(group => {
@@ -476,8 +488,19 @@ function recalculate() {
     // Use this chainring's actual physical position on the crankset
     const ringPos = chainringPosition(ring, chainrings, chainlineInner, chainlineOuter);
 
-    // Try blocking 0, 1, 2, ... maxBlock cogs from the smallest end
-    for (let block = 0; block <= maxBlock && block < cogs.length; block++) {
+    // Determine minimum physical blocks: consecutive smallest cogs where
+    // rollout exceeds the limit must be blocked regardless of chain angle
+    let minBlock = 0;
+    for (let i = 0; i < cogs.length; i++) {
+      if (calcRollout(ring, cogs[i], wheelCirc) > rolloutLimit) {
+        minBlock = i + 1;
+      } else {
+        break;
+      }
+    }
+
+    // Try blocking minBlock, minBlock+1, ... maxBlock cogs from the smallest end
+    for (let block = minBlock; block <= maxBlock && block < cogs.length; block++) {
       const availableCogs = cogs.slice(block); // remove 'block' smallest cogs
 
       // Find the smallest available cog that's within the angle threshold
@@ -577,7 +600,7 @@ function recalculate() {
     rows.forEach((r, i) => {
       if (`${configs[i].chainring}-${configs[i].blocked}` === selectedConfig) r.classList.add('selected');
     });
-    showDetail(activeCfg, chainrings, cogs, wheelCirc, chainstay, chainlineInner, chainlineOuter, hubOLD, locknutToCog, cogPitch, rolloutLimit, cadence, angleWarn, angleDanger, displayMetric);
+    showDetail(activeCfg, chainrings, cogs, wheelCirc, chainstay, chainlineInner, chainlineOuter, hubOLD, locknutToCog, cogPitch, rolloutLimit, cadence, angleWarn, angleDanger, displayMetric, excludeHighAngle);
   }
   updatePresetHighlights();
   updatePageTitle();
@@ -595,9 +618,11 @@ function showDetail(cfg, allChainrings, allCogs, wheelCirc, chainstay, chainline
   const rings = innerRing ? [innerRing, outerRing] : [outerRing];
 
   $('detailTitle').textContent = innerRing ? `${innerRing}/${outerRing}T Chainrings` : `${outerRing}T Chainring`;
-  $('detailSubtitle').textContent = cfg.blocked > 0
-    ? `Blocking ${cfg.blockedCogs.map(c=>c+'T').join(', ')} — smallest available: ${cfg.smallestAvail}T`
-    : `No cogs blocked — smallest available: ${cfg.smallestAvail}T`;
+  const subtitleParts = [];
+  if (cfg.blockedCogs.length > 0) subtitleParts.push(`Blocking ${cfg.blockedCogs.map(c=>c+'T').join(', ')}`);
+  if (cfg.angleExcludedCogs.length > 0) subtitleParts.push(`${cfg.angleExcludedCogs.map(c=>c+'T').join(', ')} excluded by chain angle`);
+  $('detailSubtitle').textContent = (subtitleParts.length > 0 ? subtitleParts.join('; ') : 'No cogs excluded')
+    + ` — smallest available: ${cfg.smallestAvail}T`;
 
   // Metric cards
   const maxSpeed = calcSpeed(outerRing, cfg.smallestAvail, wheelCirc, cadence);
